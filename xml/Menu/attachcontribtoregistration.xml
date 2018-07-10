@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<menu>
+  <item>
+    <path>civicrm/attachtoreg</path>
+    <page_callback>CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration</page_callback>
+    <title>Attach to Registration</title>
+    <access_arguments>access CiviCRM</access_arguments>
+  </item>
+</menu>
