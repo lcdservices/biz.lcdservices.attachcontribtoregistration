@@ -1,6 +1,10 @@
 {* HEADER *}
 
-<div class="help">Select the event registration record you would like to attach the contribution to.</div>
+<div class="help">{ts}Select the event registration record you would like to attach the contribution to.{/ts}</div>
+
+{if $existingRegistration}
+  <div class="help">{ts}This contribution is currently attached to a registration for:{/ts} {$existingRegistration}</div>
+{/if}
 
 {* FIELD EXAMPLE: OPTION 1 (AUTOMATIC LAYOUT) *}
 

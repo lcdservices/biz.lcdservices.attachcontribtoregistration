@@ -8,6 +8,11 @@ require_once 'CRM/Core/Form.php';
  * @see http://wiki.civicrm.org/confluence/display/CRMDOC43/QuickForm+Reference
  */
 class CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration extends CRM_Core_Form {
+
+  public $_contributionId;
+  public $_contactId;
+  public $_ppId;
+
   /**
    * check permissions
    */
@@ -25,11 +30,28 @@ class CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration extends CRM_Co
       'return' => 'contact_id',
     ));
 
+    $this->_ppId = CRM_Utils_Request::retrieve('ppid', 'Positive', $this);
+    if ($this->_ppId) {
+      try {
+        $participantId = civicrm_api3('participant_payment', 'getvalue', [
+          'id' => $this->_ppId,
+          'return' => 'participant_id',
+        ]);
+        $participant = civicrm_api3('participant', 'getsingle', ['id' => $participantId]);
+        $this->assign('existingRegistration', $participant['event_title']);
+      }
+      catch (CiviCRM_API3_Exception $e) {}
+    }
+
     //get current contact name.
     $this->assign('currentContactName', CRM_Contact_BAO_Contact::displayName($this->_contactId));
 
-    $registrationList = array();
-    $registrations = civicrm_api3('participant', 'get', array('contact_id' => $this->_contactId));
+    $registrationList = $registrations = array();
+    try {
+      $registrations = civicrm_api3('participant', 'get', ['contact_id' => $this->_contactId]);
+    }
+    catch (CiviCRM_API3_Exception $e) {}
+
     foreach ($registrations['values'] as $registration) {
       $regStartDate = date('m/d/Y', strtotime($registration['event_start_date']));
       $registrationList[$registration['id']] = $registration['event_title'].' :: '.$regStartDate." ({$registration['event_id']})";
@@ -38,6 +60,7 @@ class CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration extends CRM_Co
 
     $this->add('hidden', 'contribution_id', $this->_contributionId, array('id' => 'contribution_id'));
     $this->add('hidden', 'contact_id', $this->_contactId, array('id' => 'contact_id'));
+    $this->add('hidden', 'existing_pp_id', $this->_ppId, array('id' => 'existing_pp_id'));
 
     // export form elements
     $this->assign('elementNames', $this->getRenderableElementNames());
@@ -58,7 +81,7 @@ class CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration extends CRM_Co
     //Civi::log()->debug('postProcess', array('values' => $values));
 
     //process
-    $result = $this->AttachToRegistration($values);
+    $result = $this->attachToRegistration($values);
 
     if ($result) {
       CRM_Core_Session::setStatus(ts('Contribution attached to event registration successfully.'), ts('Attached'), 'success');
@@ -91,12 +114,18 @@ class CRM_LCD_Attachcontribtoregistration_Form_AttachRegistration extends CRM_Co
     return $elementNames;
   }
 
-  function AttachToRegistration($params) {
+  function attachToRegistration($params) {
     try {
-      $pp = civicrm_api3('participant_payment', 'create', array(
+      $ppParams = [
         'participant_id' => $params['participant_id'],
         'contribution_id' => $params['contribution_id'],
-      ));
+      ];
+
+      if (!empty($params['existing_pp_id'])) {
+        $ppParams['id'] = $params['existing_pp_id'];
+      }
+
+      $pp = civicrm_api3('participant_payment', 'create', $ppParams);
 
       if ($pp) {
         $subject = "Contribution #{$params['contribution_id']} Attached to Registration";

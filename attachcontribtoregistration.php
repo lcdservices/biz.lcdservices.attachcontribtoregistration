@@ -132,29 +132,43 @@ function attachcontribtoregistration_civicrm_searchColumns($objectName, &$header
 
   if ($objectName == 'contribution') {
     foreach ($rows as &$row) {
-      //only make available if not already attached to an event or membership
-      $connectionExists = CRM_Core_DAO::singleValueQuery("
-        SELECT COUNT(pp.id) + COUNT(mp.id)
-        FROM civicrm_contribution c
-        LEFT JOIN civicrm_participant_payment pp
-          ON c.id = pp.contribution_id
-        LEFT JOIN civicrm_membership_payment mp
-          ON c.id = mp.contribution_id
-        WHERE c.id = %1
+      //if currently attached to a membership, skip
+      $memConnExists = CRM_Core_DAO::singleValueQuery("
+        SELECT COUNT(id)
+        FROM civicrm_membership_payment
+        WHERE contribution_id = %1
       ", array(
         1 => array($row['contribution_id'], 'Positive'),
       ));
 
-      if ($connectionExists) {
+      if ($memConnExists) {
         continue;
+      }
+
+      //retrieve event connection if it exists
+      $eventConnId = CRM_Core_DAO::singleValueQuery("
+        SELECT id
+        FROM civicrm_participant_payment
+        WHERE contribution_id = %1
+        LIMIT 1
+      ", array(
+        1 => array($row['contribution_id'], 'Positive'),
+      ));
+
+      $actionLabel = 'Attach';
+      $eventParam = '';
+
+      if ($eventConnId) {
+        $actionLabel = 'Move';
+        $eventParam = "&ppid={$eventConnId}";
       }
 
       //action column is either a series of links, or a series of links plus a subset
       //unordered list (more button) -- all of which is enclosed in a span
       //we want to inject our option at the end, regardless, so we look for the existence
       //of a <ul> tag and adjust our injection accordingly
-      $url = CRM_Utils_System::url('civicrm/attachtoreg', "reset=1&id={$row['contribution_id']}");
-      $urlLink = "<a href='{$url}' class='action-item crm-hover-button medium-popup move-contrib'>Attach to Registration</a>";
+      $url = CRM_Utils_System::url('civicrm/attachtoreg', "reset=1&id={$row['contribution_id']}{$eventParam}");
+      $urlLink = "<a href='{$url}' class='action-item crm-hover-button medium-popup move-contrib'>{$actionLabel} to Registration</a>";
       if (strpos($row['action'], '</ul>') !== FALSE) {
         $row['action'] = str_replace('</ul></span>', '<li>'.$urlLink.'</li></ul></span>', $row['action']);
       }
